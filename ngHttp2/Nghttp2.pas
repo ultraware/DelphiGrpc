@@ -25,6 +25,8 @@ const
   NGHTTP2_LIB = 'nghttp2.dll';
   {$ELSEIF Defined(LINUX)}
   NGHTTP2_LIB = 'libnghttp2.so';
+  {$ELSE}
+  NGHTTP2_LIB = '';  //android etc not supported
   {$ENDIF}
 
 const
@@ -37,13 +39,19 @@ const
 
   NGHTTP2_HCAT_REQUEST = 0;
   NGHTTP2_HCAT_RESPONSE = 1;
+  NGHTTP2_HCAT_PUSH_RESPONSE = 2;
+  NGHTTP2_HCAT_HEADERS = 3;
 
   NGHTTP2_NV_FLAG_NONE = 0;
   NGHTTP2_NV_FLAG_NO_INDEX = 1;
   NGHTTP2_NV_FLAG_NO_COPY_NAME = 2;
   NGHTTP2_NV_FLAG_NO_COPY_VALUE = 4;
 
+  NGHTTP2_SETTINGS_ENABLE_PUSH = 2;
   NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS = 3;
+  NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE = 4;
+  NGHTTP2_SETTINGS_MAX_FRAME_SIZE = 5;
+  NGHTTP2_SETTINGS_MAX_HEADER_LIST_SIZE = 6;
 
   NGHTTP2_FLAG_NONE = 0;
 
@@ -117,6 +125,7 @@ type
     case Integer of
     0:(hd: nghttp2_frame_hd);
     1:(headers: nghttp2_headers);
+//    2:(data: nghttp2_data);
 //    nghttp2_frame_hd hd;
 //    nghttp2_data data;
 //    nghttp2_headers headers;
@@ -172,6 +181,9 @@ type
     const name: puint8; namelen: size_t; const value: puint8; valuelen: size_t;
     flags: uint8; user_data: Pointer): Integer; cdecl;
 
+  { Callback function invoked when the reception of header block in HEADERS or PUSH_PROMISE is started. }
+  nghttp2_on_begin_headers_callback = function(session: pnghttp2_session; const frame: pnghttp2_frame; user_data: Pointer): Integer; cdecl;
+
 type
 { nghttp2_on_frame_recv_callback }
 
@@ -213,6 +225,16 @@ var
   nghttp2_session_client_new: function(var session_ptr: pnghttp2_session;
     const callbacks: pnghttp2_session_callbacks; user_data: Pointer): Integer; cdecl = nil;
 
+(*
+ * Initializes |*session_ptr| for server use.  The all members of
+ * |callbacks| are copied to |*session_ptr|. Therefore |*session_ptr|
+ * does not store |callbacks|.  The |user_data| is an arbitrary user
+ * supplied data, which will be passed to the callback functions.
+ *)
+
+  nghttp2_session_server_new: function(var session_ptr: pnghttp2_session;
+    const callbacks: pnghttp2_session_callbacks; user_data: Pointer): Integer; cdecl = nil;
+
 { Initializes |*callbacks_ptr| with NULL values. }
   nghttp2_session_callbacks_new: function(out callbacks_ptr: pnghttp2_session_callbacks): Integer; cdecl = nil;
 
@@ -223,6 +245,10 @@ var
 { Sets callback function invoked when a header name/value pair is received. }
   nghttp2_session_callbacks_set_on_header_callback: procedure(callbacks: pnghttp2_session_callbacks;
     on_header_callback: nghttp2_on_header_callback); cdecl = nil;
+
+{ Sets callback function invoked when the reception of header block in HEADERS or PUSH_PROMISE is started. }
+  nghttp2_session_callbacks_set_on_begin_headers_callback: procedure(callbacks: pnghttp2_session_callbacks;
+    on_header_callback: nghttp2_on_begin_headers_callback); cdecl = nil;
 
 { Sets callback function invoked by `nghttp2_session_recv()` and `nghttp2_session_mem_recv()`
   when a frame is received. }
@@ -244,9 +270,17 @@ var
   nghttp2_submit_request: function(session: pnghttp2_session; const pri_spec: pnghttp2_priority_spec;
     const nva: pnghttp2_nv; nvlen: size_t; const data_prd: pnghttp2_data_provider; stream_user_data: Pointer): int32; cdecl = nil;
 
+{ Submits response HEADERS frame and optionally one or more DATA frames. }
+  nghttp2_submit_response: function(session: pnghttp2_session; stream_id: int32;
+    const nva: pnghttp2_nv; nvlen: size_t; const data_prd: pnghttp2_data_provider): int32; cdecl = nil;
+
 { Returns stream_user_data for the stream |stream_id|. }
   nghttp2_session_get_stream_user_data: function(session: pnghttp2_session;
     stream_id: int32): Pointer; cdecl = nil;
+
+{ Sets the |stream_user_data| to the stream denoted by the |stream_id| }
+  nghttp2_session_set_stream_user_data: function(session: pnghttp2_session;
+    stream_id: int32; stream_user_data: Pointer): Int32; cdecl = nil;
 
 { Processes data |in| as an input from the remote endpoint.  The
   |inlen| indicates the number of bytes in the |in|. }
@@ -324,6 +358,9 @@ end;
 
 procedure LoadNGHTTP2;
 begin
+  if NGHTTP2_LIB = '' then
+    Exit;
+
   if (NGHTTP2Handle <> 0) then Exit;
   NGHTTP2Handle := LoadLib(NGHTTP2_LIB);
   if (NGHTTP2Handle = 0) then
@@ -334,9 +371,12 @@ begin
 
   nghttp2_submit_settings := GetProc(NGHTTP2Handle, 'nghttp2_submit_settings');
   nghttp2_session_client_new := GetProc(NGHTTP2Handle, 'nghttp2_session_client_new');
+  nghttp2_session_server_new := GetProc(NGHTTP2Handle, 'nghttp2_session_server_new');
+
   nghttp2_session_callbacks_new := GetProc(NGHTTP2Handle, 'nghttp2_session_callbacks_new');
   nghttp2_session_callbacks_del := GetProc(NGHTTP2Handle, 'nghttp2_session_callbacks_del');
   nghttp2_session_callbacks_set_on_header_callback := GetProc(NGHTTP2Handle, 'nghttp2_session_callbacks_set_on_header_callback');
+  nghttp2_session_callbacks_set_on_begin_headers_callback := GetProc(NGHTTP2Handle, 'nghttp2_session_callbacks_set_on_begin_headers_callback');
   nghttp2_session_callbacks_set_on_frame_recv_callback := GetProc(NGHTTP2Handle, 'nghttp2_session_callbacks_set_on_frame_recv_callback');
   nghttp2_session_callbacks_set_on_data_chunk_recv_callback := GetProc(NGHTTP2Handle, 'nghttp2_session_callbacks_set_on_data_chunk_recv_callback');
   nghttp2_session_callbacks_set_on_stream_close_callback := GetProc(NGHTTP2Handle, 'nghttp2_session_callbacks_set_on_stream_close_callback');
@@ -344,6 +384,9 @@ begin
 
   nghttp2_submit_request := GetProc(NGHTTP2Handle, 'nghttp2_submit_request');
   nghttp2_session_get_stream_user_data := GetProc(NGHTTP2Handle, 'nghttp2_session_get_stream_user_data');
+  nghttp2_session_set_stream_user_data := GetProc(NGHTTP2Handle, 'nghttp2_session_set_stream_user_data');
+
+  nghttp2_submit_response := GetProc(NGHTTP2Handle, 'nghttp2_submit_response');
 
   nghttp2_session_mem_recv := GetProc(NGHTTP2Handle, 'nghttp2_session_mem_recv');
   nghttp2_session_mem_send := GetProc(NGHTTP2Handle, 'nghttp2_session_mem_send');
