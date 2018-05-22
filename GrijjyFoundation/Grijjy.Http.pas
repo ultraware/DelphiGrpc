@@ -23,8 +23,9 @@ uses
   {$IFDEF MSWINDOWS}
   Grijjy.SocketPool.Win,
   Windows,
-  {$ENDIF}
-  {$IFDEF LINUX}
+  {$ELSE IFDEF MOBILE}
+  Grijjy.SocketPool.Dummy,
+  {$ELSE IFDEF LINUX}
   Grijjy.SocketPool.Linux,
   Posix.Pthread,
   {$ENDIF}
@@ -38,8 +39,8 @@ const
   BUFFER_SIZE = 32768;
 
   { Timeout for operations }
-  TIMEOUT_CONNECT = 20000;
-  TIMEOUT_RECV = 5000;
+  TIMEOUT_CONNECT = 10000;
+  TIMEOUT_RECV = 15000;
 
   { Strings }
   S_CONTENT_LENGTH = 'content-length';
@@ -85,7 +86,11 @@ type
     function GetSize: Integer;
   public
     { Write buffer }
-    procedure Write(const ABuffer: Pointer; const ASize: Integer);
+    procedure Write(const ABuffer: Pointer; const ASize: Integer); overload;
+    procedure Write(const ABytes: TBytes); overload;
+
+    { Try to read (without removing) count number of bytes from the buffer }
+    function Peek(out ABytes: TBytes; const ACount: Integer): Boolean;
 
     { Read entire buffer }
     function Read(out ABytes: TBytes): Boolean; overload;
@@ -340,6 +345,13 @@ type
     { Convert bytes to string }
     function BytesToString(const ABytes: TBytes; const ACharset: String): String;
   public
+    {$IFDEF HTTP2}
+    IsPendingSend: Boolean;
+    IsSendEOF: Boolean;
+    procedure SendMoreData(const aData: TBytes);
+    function  SendAndClose(const aData: TBytes; aWait: boolean): TBytes;
+    {$ENDIF}
+
     { State }
     property State: TgoHttpClientState read FState;
 
@@ -456,14 +468,19 @@ type
 
 var
   HttpClientManager: TgoHttpClientManager;
+  HttpClientSocketManager: TgoClientSocketManager;   //TODO: make release procedure in connection object itself?
 
 implementation
 
 uses
   Grijjy.SysUtils;
 
-var
-  _HttpClientSocketManager: TgoClientSocketManager;
+procedure OutputDebug(const aString: string);
+begin
+  {$ifdef MSWINDOWS}
+  OutputDebugString(PChar(aString))
+  {$endif}
+end;
 
 { ngHttp2 callback cdecl }
 
@@ -547,6 +564,31 @@ begin
   end;
 end;
 
+function TThreadSafeBuffer.Peek(out ABytes: TBytes; const ACount: Integer): Boolean;
+var
+  Size: Integer;
+begin
+  FLock.Enter;
+  try
+    if FSize > 0 then
+    begin
+      { read bytes into new buffer }
+      if FSize >= ACount then
+        Size := ACount
+      else
+        Size := FSize;
+      SetLength(ABytes, Size);
+      Move(FBuffer[0], ABytes[0], Size);
+
+      Result := True;
+    end
+    else
+      Result := False;
+  finally
+    FLock.Leave;
+  end;
+end;
+
 procedure TThreadSafeBuffer.Write(const ABuffer: Pointer; const ASize: Integer);
 begin
   FLock.Enter;
@@ -561,6 +603,11 @@ begin
   finally
     FLock.Leave;
   end;
+end;
+
+procedure TThreadSafeBuffer.Write(const ABytes: TBytes);
+begin
+  Write(@ABytes[0], Length(ABytes));
 end;
 
 function TThreadSafeBuffer.Read(out ABytes: TBytes): Boolean;
@@ -923,7 +970,7 @@ begin
       Settings.value := 100;
       Error := nghttp2_submit_settings(FSession_http2, NGHTTP2_FLAG_NONE, @Settings, 1);
       if (Error <> 0) then
-        raise Exception.Create('Unable to  submit ngHttp2 settings');
+        raise Exception.Create('Unable to submit ngHttp2 settings');
     end
     else
       raise Exception.Create('Unable to setup ngHttp2 session.');
@@ -969,7 +1016,7 @@ begin
     FConnectionLock.Leave;
   end;
   if Connection <> nil then
-    _HttpClientSocketManager.Release(Connection);
+    HttpClientSocketManager.Release(Connection);
   FreeAndNil(FRequestHeaders);
   FreeAndNil(FInternalHeaders);
   FreeAndNil(FResponseHeaders);
@@ -994,7 +1041,9 @@ begin
   begin
     Result := FSendBuffer.Size;
     FSendBuffer.Read(Buf, Result);
-    data_flags^ := data_flags^ or NGHTTP2_DATA_FLAG_EOF;
+    if not IsPendingSend then
+      data_flags^ := data_flags^ or NGHTTP2_DATA_FLAG_EOF;
+    IsSendEOF := True;
   end
   else
   begin
@@ -1050,7 +1099,9 @@ function TgoHttpClient.nghttp2_on_frame_recv_callback(session: pnghttp2_session;
 begin
   {$IFDEF LOGGING}
   //grLog('on_frame_recv_callback');
+  OutputDebug(Format('frame type: %d',[frame.hd.&type]));
   {$ENDIF}
+
   if frame.hd.&type = _NGHTTP2_HEADERS then
     if (frame.headers.cat = NGHTTP2_HCAT_RESPONSE) then
     begin
@@ -1109,6 +1160,9 @@ begin
       Move(data^, Bytes[0], len);
       Result := FConnection.Send(Bytes);
     end;
+
+    if IsSendEOF then
+      Break;
   end;
 end;
 
@@ -1121,7 +1175,6 @@ begin
     nghttp2_session_mem_recv(FSession_http2, @Bytes[0], Length(Bytes));
 end;
 {$ENDIF}
-
 
 function TgoHttpClient.GetIdleTime: Integer;
 begin
@@ -1287,6 +1340,36 @@ begin
   end;
 end;
 
+{$IFDEF HTTP2}
+function TgoHttpClient.SendAndClose(const aData: TBytes; aWait: boolean): TBytes;
+var again: Boolean;
+begin
+  IsPendingSend := False;
+  IsSendEOF := False;
+  FSendBuffer.Write(@aData[0], Length(aData));
+  nghttp2_Send;
+
+  if not aWait then
+    Exit;
+
+  FBlocking := True;
+  if WaitForRecv then
+  begin
+    again  := False;
+    Result := DoResponse(again);
+    FState := TgoHttpClientState.Finished;
+  end;
+end;
+
+procedure TgoHttpClient.SendMoreData(const aData: TBytes);
+begin
+  IsPendingSend := True;
+  IsSendEOF := False;
+  FSendBuffer.Write(@aData[0], Length(aData));
+  nghttp2_Send;
+end;
+{$ENDIF}
+
 function TgoHttpClient.SendRequest: Boolean;
 var
   Headers: String;
@@ -1430,12 +1513,12 @@ var
         (FURI.Host <> FLastURI.Host ) or
         (FURI.Port <> FLastURI.Port)) then
       begin
-        _HttpClientSocketManager.Release(FConnection);
+        HttpClientSocketManager.Release(FConnection);
         FConnection := nil;
       end;
       if FConnection = nil then
       begin
-        FConnection := _HttpClientSocketManager.Request(FURI.Host, FURI.Port);
+        FConnection := HttpClientSocketManager.Request(FURI.Host, FURI.Port);
         FConnection.OnConnected := OnSocketConnected;
         FConnection.OnDisconnected := OnSocketDisconnected;
         FConnection.OnRecv := OnSocketRecv;
@@ -1716,6 +1799,7 @@ end;
 procedure TgoHttpClient.OnSocketRecv(const ABuffer: Pointer; const ASize: Integer);
 var
   ResponseMessage: TgoHttpResponseMessage;
+  allDataReceived: Boolean;
 begin
   {$IFDEF LOGGING}
   //grLog(Format('OnSocketRecv (ThreadId=%d, Size=%d)', [GetCurrentThreadId, ASize]), ABuffer, ASize);
@@ -1733,10 +1817,15 @@ begin
   begin
     if FBlocking then
       FRecv.SetEvent
-    else
+    else if ResponseHeader then
     begin
-      if ResponseHeader and ResponseContent then
+      allDataReceived := ResponseContent;
+      if allDataReceived
+         {$IFDEF HTTP2} or (FHttp2 and (FResponse <> nil)) {$ENDIF} then  //gRPC sends a stream with seperate objects
       begin
+        if allDataReceived then
+          FState := TgoHttpClientState.Finished;  //set state before msg, so state can be read (e.g. is finished = last message)
+
         ResponseMessage := TgoHttpResponseMessage.Create(
           Self,
           FResponseHeaders,
@@ -1744,8 +1833,8 @@ begin
           FResponseContentType,
           FResponseContentCharset,
           FResponse);
+        FResponse := nil;  //clear streaming gRPC data
         TMessageManager.DefaultManager.SendMessage(Self, ResponseMessage);
-        FState := TgoHttpClientState.Finished;
       end;
     end;
   end;
@@ -1910,11 +1999,11 @@ begin
 end;
 
 initialization
-  _HttpClientSocketManager := TgoClientSocketManager.Create;
+  HttpClientSocketManager := TgoClientSocketManager.Create;
   HttpClientManager := TgoHttpClientManager.Create;
 
 finalization
   HttpClientManager.Free;
-  _HttpClientSocketManager.Free;
+  HttpClientSocketManager.Free;
 
 end.
