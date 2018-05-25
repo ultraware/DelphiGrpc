@@ -1,0 +1,63 @@
+object frmClient: TfrmClient
+  Left = 0
+  Top = 0
+  Caption = 'Client'
+  ClientHeight = 343
+  ClientWidth = 759
+  FormFactor.Width = 320
+  FormFactor.Height = 480
+  FormFactor.Devices = [Desktop]
+  OnCreate = FormCreate
+  DesignerMasterStyle = 0
+  object Memo1: TMemo
+    Touch.InteractiveGestures = [Pan, LongTap, DoubleTap]
+    DataDetectorTypes = []
+    Anchors = [akLeft, akTop, akRight, akBottom]
+    Position.X = 8.000000000000000000
+    Position.Y = 40.000000000000000000
+    Size.Width = 744.000000000000000000
+    Size.Height = 297.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 0
+    Viewport.Width = 740.000000000000000000
+    Viewport.Height = 293.000000000000000000
+  end
+  object Button1: TButton
+    Position.X = 8.000000000000000000
+    Position.Y = 8.000000000000000000
+    TabOrder = 1
+    Text = 'Sleep(3)'
+    OnClick = Button1Click
+  end
+  object Button2: TButton
+    Position.X = 96.000000000000000000
+    Position.Y = 8.000000000000000000
+    TabOrder = 3
+    Text = 'CountDown(5)'
+    OnClick = Button2Click
+  end
+  object Button3: TButton
+    Position.X = 184.000000000000000000
+    Position.Y = 8.000000000000000000
+    TabOrder = 5
+    Text = 'CalcSum'
+    OnClick = Button3Click
+  end
+  object Button4: TButton
+    Position.X = 272.000000000000000000
+    Position.Y = 8.000000000000000000
+    Size.Width = 145.000000000000000000
+    Size.Height = 22.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 7
+    Text = 'UpdateableCountDown'
+    OnClick = Button4Click
+  end
+  object Button5: TButton
+    Position.X = 424.000000000000000000
+    Position.Y = 8.000000000000000000
+    TabOrder = 9
+    Text = 'Button5'
+    Visible = False
+  end
+end

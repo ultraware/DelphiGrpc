@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package testservice;
+
+// Interface exported by the server.
+service TestService {
+  rpc Sleep(Time) returns (Time) {}
+  rpc CountDown(Time) returns (stream Time) {}
+  rpc CalcSum(stream Time) returns (Time) {}
+  rpc UpdateableCountDown(stream Time) returns (stream Time) {}
+}
+
+message Time {
+  int32 sec = 1;
+  string msg = 2;
+}
