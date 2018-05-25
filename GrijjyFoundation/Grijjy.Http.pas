@@ -922,6 +922,9 @@ procedure TgoHttpClientManager.Execute;
 var
   LastCleanup: TDateTime;
 begin
+  {$IFDEF DEBUG}
+  NameThreadForDebugging(Self.Classname);
+  {$ENDIF}
   LastCleanup := Now;
   while not Terminated do
   begin

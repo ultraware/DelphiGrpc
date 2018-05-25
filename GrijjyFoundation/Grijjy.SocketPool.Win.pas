@@ -54,7 +54,7 @@ type
   TgoSocketConnection = class;
 
   { Internal operation }
-  TgoSocketOperation = (Connect, Disconnect, ReadZero, Read, Write);
+  TgoSocketOperation = (Connect, Disconnect, ReadZero, Read, Write, Accept);
 
   { Internal performance optimization }
   TgoSocketOptimization = (Speed, Scale);
@@ -69,6 +69,7 @@ type
   TgoSocketNotifyEvent = procedure of object;
   TgoSocketDataEvent = procedure(const ABuffer: Pointer; const ASize: Integer)
     of object;
+  TgoSocketConnectionEvent = procedure(aConnection: TgoSocketConnection) of object;
 
   { Iocp per transaction struct }
   PPerIoData = ^TPerIoData;
@@ -83,6 +84,10 @@ type
   { Socket connection instance }
   TgoSocketConnection = class(TObject)
   private
+    FAcceptBuffer: string;
+    FAcceptSocket: THandle;
+    FAcceptReceived: Cardinal;
+
     FOwner: TgoClientSocketManager;
     FSocket: THandle;
     FHostname: String;
@@ -108,9 +113,9 @@ type
     {$ENDIF}
 
     { Pending operations }
-    function AddRef(const AOperation: TgoSocketOperation): Boolean; inline;
+    function  AddRef(const AOperation: TgoSocketOperation): Boolean; inline;
     procedure ReleaseRef(const AOperation: TgoSocketOperation); inline;
-    function ReleaseRefCheckShutdown(const AOperation: TgoSocketOperation): Boolean; inline;
+    function  ReleaseRefCheckShutdown(const AOperation: TgoSocketOperation): Boolean; inline;
   protected
     FOnConnectedLock: TCriticalSection;
     FOnConnected: TgoSocketNotifyEvent;
@@ -167,24 +172,33 @@ type
     { Connect the socket }
     function PostConnect(const AHostname: String;
       const APort: Word; const AUseNagle: Boolean = False): Boolean;
+    function PostAccept(const AHostname: String;
+      const APort: Word; const AUseNagle: Boolean = False): Boolean;
+    function QueueAccept(): Boolean;
 
     { Disconnect the socket }
     function PostDisconnect: Boolean;
   private
+    FOnAccept: TgoSocketConnectionEvent;
     { Handle data that is read from the socket }
     procedure Read(const ABuffer: Pointer; const ASize: Integer); inline;
 
     { Write data to the socket }
     function Write(const ABuffer: Pointer; const ASize: Integer): Boolean; inline;
+    procedure SetState(const Value: TgoConnectionState);
   public
     constructor Create(const AOwner: TgoClientSocketManager; const AHostname: String; const APort: Word);
+    constructor CreateByHandle(const AOwner: TgoClientSocketManager; const aSocket: THandle);
+
     destructor Destroy; override;
   public
     { Connects the socket }
     function Connect(const AUseNagle: Boolean = True): Boolean;
+    function Accept(const AUseNagle: Boolean = True): Boolean;
 
     { Disconnects the socket }
     procedure Disconnect;
+    procedure CloseAccept;
 
     { Sends the bytes to the socket }
     function Send(const ABuffer: Pointer; const ASize: Integer): Boolean; overload;
@@ -206,7 +220,7 @@ type
     property Port: Word read FPort;
 
     { Current state of the socket connection }
-    property State: TgoConnectionState read FState write FState;
+    property State: TgoConnectionState read FState write SetState;
 
     { Number of pending operations on the socket }
     property Pending: Integer read GetPending;
@@ -247,12 +261,15 @@ type
 
     { Fired when the data has been sent by the socket }
     property OnSent: TgoSocketDataEvent read FOnSent write FOnSent;
+
+    property OnAccept: TgoSocketConnectionEvent read FOnAccept write FOnAccept;
   end;
 
   { Socket pool worker thread }
   TSocketPoolWorker = class(TThread)
   private
     FOwner: TgoClientSocketManager;
+    procedure HandleAccept(aConnection: TgoSocketConnection; aPerIoData: PPerIoData);
   protected
     procedure Execute; override;
   public
@@ -323,6 +340,8 @@ begin
       Result := 'Read';
     TgoSocketOperation.Write:
       Result := 'Write';
+  else
+    Assert(false);
   end;
 end;
 
@@ -369,8 +388,28 @@ begin
   FOnSentLock := TCriticalSection.Create;
 end;
 
+constructor TgoSocketConnection.CreateByHandle(const AOwner: TgoClientSocketManager; const aSocket: THandle);
+begin
+  Create(aOwner, '', 0);
+  FSocket := aSocket;
+  FState := TgoConnectionState.Connected;
+  FPending[TgoSocketOperation.Connect] := 1;
+
+  { associate socket and connection object with completion port }
+  if CreateIoCompletionPort(FSocket, FOwner.Handle, ULONG_PTR(Self), 0) = 0 then
+  begin
+    {$IFDEF GRIJJYLOGGING}
+    HandleError('PostConnect.CreateIoCompletionPort');
+    {$ENDIF}
+    closesocket(FSocket);
+    Closed := True;
+    Exit;
+  end;
+end;
+
 destructor TgoSocketConnection.Destroy;
 begin
+  CloseAccept;
   Disconnect;
   if FReadBuffer <> nil then
     _MemBufferPool.ReleaseMem(FReadBuffer, '_TgoSocketConnection.ReadBuffer');
@@ -411,6 +450,15 @@ begin
 end;
 {$ENDIF}
 
+function TgoSocketConnection.Accept(const AUseNagle: Boolean): Boolean;
+begin
+  Reset;
+  if PostAccept(FHostname, FPort, AUseNagle) then
+    Result := True
+  else
+    Result := False;
+end;
+
 function TgoSocketConnection.AddRef(const AOperation: TgoSocketOperation): Boolean;
 begin
   FLock.Enter;
@@ -424,8 +472,12 @@ begin
         Inc(FPending[AOperation]);
         Result := True;
       end
-      else
-      if AOperation = TgoSocketOperation.Disconnect then
+      else if AOperation = TgoSocketOperation.Accept then
+      begin
+        Inc(FPending[AOperation]);
+        Result := True;
+      end
+      else if AOperation = TgoSocketOperation.Disconnect then
       begin
         Inc(FPending[AOperation]);
         Result := True;
@@ -481,6 +533,11 @@ end;
 procedure TgoSocketConnection.SetPrivateKey(const Value: TBytes);
 begin
   OpenSSL.PrivateKey := Value;
+end;
+
+procedure TgoSocketConnection.SetState(const Value: TgoConnectionState);
+begin
+  FState := Value;
 end;
 
 function TgoSocketConnection.GetCertificate: TBytes;
@@ -699,6 +756,174 @@ begin
     Result := True;
 end;
 
+function TgoSocketConnection.PostAccept(const AHostname: String; const APort: Word; const AUseNagle: Boolean): Boolean;
+var
+  Hints: TAddrInfoW;
+  AddrInfo: PAddrInfoW;
+  ConnectAddr: TSockAddrIn;
+  Port: String;
+  Size: Integer;
+begin
+  Result := False;
+  FillChar(Hints, SizeOf(TAddrInfoW), 0);
+  Hints.ai_family := AF_INET;
+  Hints.ai_socktype := SOCK_STREAM;
+  Hints.ai_protocol := IPPROTO_TCP;
+  AddrInfo := nil;
+
+  { get the addrinfo for hostname and port }
+  Port := IntToStr(APort);
+  if getaddrinfo(PWideChar(AHostname), PWideChar(Port), @Hints, @AddrInfo) <> 0 then
+  begin
+    {$IFDEF GRIJJYLOGGING}
+    HandleWSAError('PostConnect.getaddrinfo');
+    {$ENDIF}
+    RaiseLastOSError;
+    Exit;
+  end;
+
+  try
+    { create an overlapped socket }
+    FSocket := WSASocket(AF_INET, SOCK_STREAM, 0, nil, 0, WSA_FLAG_OVERLAPPED);
+    if FSocket = INVALID_SOCKET then
+    begin
+      {$IFDEF GRIJJYLOGGING}
+      HandleWSAError('PostConnect.WSASocket');
+      {$ENDIF}
+      RaiseLastOSError;
+      Exit;
+    end;
+
+//    (*
+    { set SO_SNDBUF to zero for a zero-copy network stack as we maintain the buffers }
+    Size := 0;
+    if setsockopt(FSocket, SOL_SOCKET, SO_SNDBUF, @Size, SizeOf(Size)) = SOCKET_ERROR
+    then
+    begin
+      {$IFDEF GRIJJYLOGGING}
+      HandleError('PostConnect.setsockopt');
+      {$ENDIF}
+      RaiseLastOSError;
+      Exit;
+    end;
+
+    { set SO_RCVBUF to zero for a zero-copy network stack as we maintain the buffers }
+    Size := 0;
+    if setsockopt(FSocket, SOL_SOCKET, SO_RCVBUF, @Size, SizeOf(Size)) = SOCKET_ERROR
+    then
+    begin
+      {$IFDEF GRIJJYLOGGING}
+      HandleError('PostConnect.setsockopt');
+      {$ENDIF}
+      RaiseLastOSError;
+      Exit;
+    end;
+
+    { set TCP_NODELAY to reduce latency }
+    if not AUseNagle then
+    begin
+      Size := 0;
+      if setsockopt(FSocket, IPPROTO_TCP, TCP_NODELAY, @Size, SizeOf(Size)) = SOCKET_ERROR then
+      begin
+        {$IFDEF GRIJJYLOGGING}
+        HandleError('PostConnect.setsockopt');
+        {$ENDIF}
+        RaiseLastOSError;
+        Exit;
+      end;
+    end;
+//    *)
+
+    { associate socket and connection object with completion port }
+    if CreateIoCompletionPort(FSocket, FOwner.Handle, ULONG_PTR(Self), 0) = 0
+    then
+    begin
+      {$IFDEF GRIJJYLOGGING}
+      HandleError('PostConnect.CreateIoCompletionPort');
+      {$ENDIF}
+      closesocket(FSocket);
+      Closed := True;
+      RaiseLastOSError;
+      Exit;
+    end;
+
+    { bind the socket }
+    ConnectAddr.sin_family := AF_INET;
+    if AHostname = '' then
+      ConnectAddr.sin_addr.S_addr := INADDR_ANY
+    else
+      ConnectAddr.sin_addr.S_addr := inet_addr(PAnsiChar(AnsiString(AHostname)));
+    ConnectAddr.sin_port := htons(APort);
+    if bind(FSocket, @ConnectAddr, SizeOf(ConnectAddr)) = SOCKET_ERROR then
+    begin
+      {$IFDEF GRIJJYLOGGING}
+      HandleWSAError('PostConnect.bind');
+      {$ENDIF}
+      closesocket(FSocket);
+      Closed := True;
+      RaiseLastOSError;
+      Exit;
+    end;
+
+    { listen mode }
+    if listen(FSocket, SOMAXCONN) = SOCKET_ERROR then
+    begin
+      {$IFDEF GRIJJYLOGGING}
+      HandleWSAError('PostConnect.listen');
+      {$ENDIF}
+      closesocket(FSocket);
+      Closed := True;
+      RaiseLastOSError;
+      Exit;
+    end;
+
+    Result := QueueAccept;
+  finally
+    freeaddrinfo(AddrInfo);
+  end;
+end;
+
+function TgoSocketConnection.QueueAccept: Boolean;
+var
+  PerIoData: PPerIoData;
+begin
+  Result := False;
+  //create socket for future channel
+  FAcceptSocket := WSASocketA(AF_INET, SOCK_STREAM, 0, Nil, 0, WSA_FLAG_OVERLAPPED);
+  if FAcceptSocket = INVALID_SOCKET then
+  begin
+    {$IFDEF GRIJJYLOGGING}
+    HandleWSAError('PostConnect.WSASocket (accept)');
+    {$ENDIF}
+    RaiseLastOSError;
+  end;
+
+  //allocate buffer for remote address
+  SetLength(FAcceptBuffer, 64);
+
+  { queue a connect command to the completion port }
+  //_Log('PostConnect');
+  if not AddRef(TgoSocketOperation.Accept) then Exit;
+  PerIoData := _PerIoDataPool.RequestMem('_TgoSocketConnection.PostConnect.PerIoData');
+  PerIoData.Socket := FSocket;
+  PerIoData.Operation := TgoSocketOperation.Accept;
+  if not AcceptEx(FSocket, FAcceptSocket, @FAcceptBuffer[1], 0, sizeof(TSockAddrIn)+16, sizeof(TSockAddrIn)+16, FAcceptReceived, POverlapped(PerIoData)) and
+    (WSAGetLastError <> WSA_IO_PENDING) then
+  begin
+    {$IFDEF GRIJJYLOGGING}
+    HandleWSAError('PostConnect.AcceptEx');
+    {$ENDIF}
+    _PerIoDataPool.ReleaseMem(PerIoData, '_TgoSocketConnection.PostConnect.PerIoData');
+    ReleaseRef(TgoSocketOperation.Accept);
+    closesocket(FSocket);
+    Closed := True;
+    RaiseLastOSError;
+  end
+  else
+    Result := True;
+end;
+
+
 function TgoSocketConnection.PostConnect(const AHostname: String;
   const APort: Word; const AUseNagle: Boolean): Boolean;
 var
@@ -882,6 +1107,13 @@ begin
   end;
 end;
 
+procedure TgoSocketConnection.CloseAccept;
+begin
+  //FPending[TgoSocketOperation.Connect] := 0;
+  CloseSocket(FAcceptSocket);
+  CloseSocket(FSocket);
+end;
+
 function TgoSocketConnection.Connect(const AUseNagle: Boolean): Boolean;
 begin
   Reset;
@@ -898,6 +1130,9 @@ begin
   { if not already shutdown, then post disconnect }
   if not Shutdown then
   begin
+    //TODO: make override in descendant class?
+    FPending[TgoSocketOperation.Connect] := 0;    //force "close" of connection made by "CreateByHandle", otherwise memleak
+
     { we set the state to disconnecting so we know when the OnDisconnected event
       was triggered gracefully by a requested disconnect or abruptly by a socket error }
     FState := TgoConnectionState.Disconnecting;
@@ -1112,6 +1347,10 @@ begin
                     end;
                 end;
               end;
+            TgoSocketOperation.Accept:
+              begin
+                HandleAccept(Connection, PerIoData);
+              end;
             TgoSocketOperation.Disconnect:
               begin
                 Connection.FOnDisconnectedLock.Enter;
@@ -1124,7 +1363,9 @@ begin
                 end;
                 Connection.State := TgoConnectionState.Disconnected;
               end;
-          end;
+          else
+            Assert(False);
+          end
         end
         else { PerIoData = nil }
           if Connection = nil then
@@ -1182,15 +1423,62 @@ begin
         if HasOverlappedIoCompleted(PerIoData) then
           case PerIoData.Operation of
             TgoSocketOperation.Connect: _PerIoDataPool.ReleaseMem(PerIoData, '_TgoSocketConnection.PostConnect.PerIoData');
+            TgoSocketOperation.Accept: _PerIoDataPool.ReleaseMem(PerIoData, '_TgoSocketConnection.PostConnect.PerIoData');
             TgoSocketOperation.Disconnect: _PerIoDataPool.ReleaseMem(PerIoData, '_TgoSocketConnection.PostDisconnect.PerIoData');
             TgoSocketOperation.ReadZero: _PerIoDataPool.ReleaseMem(PerIoData, '_TgoSocketConnection.PostReadZero.PerIoData');
             TgoSocketOperation.Read: _PerIoDataPool.ReleaseMem(PerIoData, '_TgoSocketConnection.PostRead.PerIoData');
             TgoSocketOperation.Write: _PerIoDataPool.ReleaseMem(PerIoData, '_TgoSocketConnection.PostWrite.PerIoData');
+          else
+            Assert(false);
           end;
       end;
     end;
   end;
   //Log('Worker thread finished.');
+end;
+
+const
+ MY_SO_UPDATE_ACCEPT_CONTEXT = $700B;
+
+procedure TSocketPoolWorker.HandleAccept(aConnection: TgoSocketConnection; aPerIoData: PPerIoData);
+var
+  newSocket: THandle;
+  newConnection: TgoSocketConnection;
+begin
+  newSocket := aConnection.FAcceptSocket;
+
+  // UPDATE_ACCEPT_CONTEXT
+  if setsockopt(newSocket, SOL_SOCKET, MY_SO_UPDATE_ACCEPT_CONTEXT, PAnsiChar(@aConnection.FSocket), sizeof(aConnection.FSocket)) <> 0 then
+    RaiseLastOSError;
+
+  //queue new accept?
+  aConnection.QueueAccept();
+
+  //FConnection := _HttpClientSocketManager.Request(FURI.Host, FURI.Port);
+  newConnection := TgoSocketConnection.CreateByHandle(aConnection.FOwner, newSocket);
+  newConnection.OnConnected := aConnection.OnConnected;
+  newConnection.OnDisconnected := aConnection.OnDisconnected;
+  newConnection.OnRecv := aConnection.OnRecv;
+
+  //make new session in server etc
+  aConnection.OnAccept(newConnection);
+  newConnection.State := TgoConnectionState.Connected;
+  newConnection.FOnConnectedLock.Enter;
+  try
+    if Assigned(newConnection.FOnConnected) then
+      newConnection.FOnConnected;
+  finally
+    newConnection.FOnConnectedLock.Leave;
+  end;
+
+  case FOwner.Optimization of
+    TgoSocketOptimization.Speed:
+      begin
+        if not newConnection.PostRead(newConnection.FReadBuffer) then ;
+      end;
+    TgoSocketOptimization.Scale:
+      if not newConnection.PostReadZero then ;
+  end;
 end;
 
 { TgoClientSocketManager }
@@ -1400,6 +1688,9 @@ var
   Socket: TSocket;
 {$ENDIF}
 begin
+  if AConnection = nil then
+    Exit;
+
   {$IFDEF GRIJJYLOGGING}
   Socket := AConnection.Socket;
   {$ENDIF}
@@ -1431,7 +1722,8 @@ begin
   { add the new connection }
   ConnectionsLock.Enter;
   try
-    Connections.Add(AConnection);
+    if not Connections.Contains(AConnection) then
+      Connections.Add(AConnection);
   finally
     ConnectionsLock.Leave;
   end;
