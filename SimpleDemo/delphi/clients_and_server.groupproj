@@ -1,0 +1,84 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{072FD021-896E-4A65-B09A-F9DCC5651AF5}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="client.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="server.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="AndroidGrpc.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="LinuxClient.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="..\..\Test\gRPCtest.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="client">
+        <MSBuild Projects="client.dproj"/>
+    </Target>
+    <Target Name="client:Clean">
+        <MSBuild Projects="client.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="client:Make">
+        <MSBuild Projects="client.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="server">
+        <MSBuild Projects="server.dproj"/>
+    </Target>
+    <Target Name="server:Clean">
+        <MSBuild Projects="server.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="server:Make">
+        <MSBuild Projects="server.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="AndroidGrpc">
+        <MSBuild Projects="AndroidGrpc.dproj"/>
+    </Target>
+    <Target Name="AndroidGrpc:Clean">
+        <MSBuild Projects="AndroidGrpc.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="AndroidGrpc:Make">
+        <MSBuild Projects="AndroidGrpc.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="LinuxClient">
+        <MSBuild Projects="LinuxClient.dproj"/>
+    </Target>
+    <Target Name="LinuxClient:Clean">
+        <MSBuild Projects="LinuxClient.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="LinuxClient:Make">
+        <MSBuild Projects="LinuxClient.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="gRPCtest">
+        <MSBuild Projects="..\..\Test\gRPCtest.dproj"/>
+    </Target>
+    <Target Name="gRPCtest:Clean">
+        <MSBuild Projects="..\..\Test\gRPCtest.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="gRPCtest:Make">
+        <MSBuild Projects="..\..\Test\gRPCtest.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="client;server;AndroidGrpc;LinuxClient;gRPCtest"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="client:Clean;server:Clean;AndroidGrpc:Clean;LinuxClient:Clean;gRPCtest:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="client:Make;server:Make;AndroidGrpc:Make;LinuxClient:Make;gRPCtest:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>

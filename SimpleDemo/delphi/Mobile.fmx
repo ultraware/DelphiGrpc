@@ -1,0 +1,99 @@
+object Form4: TForm4
+  Left = 0
+  Top = 0
+  Caption = 'Form4'
+  ClientHeight = 505
+  ClientWidth = 360
+  FormFactor.Width = 320
+  FormFactor.Height = 480
+  FormFactor.Devices = [Desktop]
+  OnCreate = FormCreate
+  DesignerMasterStyle = 3
+  object Button1: TButton
+    Position.Y = 59.000000000000000000
+    Size.Width = 81.000000000000000000
+    Size.Height = 33.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 3
+    Text = 'Sleep(2)'
+    OnClick = Button1Click
+  end
+  object edtHost: TEdit
+    Touch.InteractiveGestures = [LongTap, DoubleTap]
+    Anchors = [akLeft, akTop, akRight]
+    TabOrder = 4
+    TabStop = False
+    Position.X = 96.000000000000000000
+    Position.Y = 23.000000000000000000
+    Size.Width = 251.000000000000000000
+    Size.Height = 32.000000000000000000
+    Size.PlatformDefault = False
+    ParentShowHint = False
+    ShowHint = False
+    object EditButton1: TEditButton
+      CanFocus = False
+      Cursor = crArrow
+      TabOrder = 0
+    end
+  end
+  object Memo1: TMemo
+    Touch.InteractiveGestures = [Pan, LongTap, DoubleTap]
+    DataDetectorTypes = []
+    Align = Bottom
+    Anchors = [akLeft, akTop, akRight, akBottom]
+    Margins.Left = 5.000000000000000000
+    Margins.Top = 5.000000000000000000
+    Margins.Right = 5.000000000000000000
+    Margins.Bottom = 5.000000000000000000
+    Position.X = 5.000000000000000000
+    Position.Y = 104.000000000000000000
+    Size.Width = 350.000000000000000000
+    Size.Height = 396.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 5
+    Viewport.Width = 342.000000000000000000
+    Viewport.Height = 388.000000000000000000
+  end
+  object Button2: TButton
+    Position.X = 80.000000000000000000
+    Position.Y = 59.000000000000000000
+    Size.Width = 129.000000000000000000
+    Size.Height = 33.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 0
+    Text = 'CountDown(5)'
+    OnClick = Button2Click
+  end
+  object Label1: TLabel
+    Position.X = 8.000000000000000000
+    Position.Y = 27.000000000000000000
+    Text = 'Server:'
+  end
+  object Button3: TButton
+    Position.X = 208.000000000000000000
+    Position.Y = 59.000000000000000000
+    Size.Width = 49.000000000000000000
+    Size.Height = 33.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 2
+    Text = 'Sum'
+    OnClick = Button3Click
+  end
+  object Button4: TButton
+    Position.X = 256.000000000000000000
+    Position.Y = 59.000000000000000000
+    Size.Width = 97.000000000000000000
+    Size.Height = 33.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 1
+    Text = 'Countdown'
+    OnClick = Button4Click
+  end
+  object Layout1: TLayout
+    Align = Top
+    Size.Width = 360.000000000000000000
+    Size.Height = 17.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 6
+  end
+end
