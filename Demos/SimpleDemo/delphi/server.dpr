@@ -8,7 +8,7 @@ uses
   System.SysUtils,
   TestService.impl in 'TestService.impl.pas',
   TestService.grpc in 'TestService.grpc.pas',
-  Ultraware.Grpc in '..\..\gRPC\Ultraware.Grpc.pas',
+  Ultraware.Grpc in '..\..\..\gRPC\Ultraware.Grpc.pas',
   //Ultraware.Grpc.ws in '..\..\gRPC\Ultraware.Grpc.ws.pas',
   //IdStack; // in 'c:\program files (x86)\embarcadero\studio\18.0\source\Indy10\System\IdStack.pas';
   System.Classes;

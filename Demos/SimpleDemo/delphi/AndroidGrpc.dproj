@@ -118,7 +118,7 @@
         <AUP_CALL_PHONE>true</AUP_CALL_PHONE>
         <AUP_READ_PHONE_STATE>true</AUP_READ_PHONE_STATE>
         <AUP_READ_EXTERNAL_STORAGE>true</AUP_READ_EXTERNAL_STORAGE>
-        <DCC_UnitSearchPath>..\..\gRPC;..\..\GrijjyFoundation;..\..\..\..\Componenten\sgcWebSockets\Source\;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+        <DCC_UnitSearchPath>..\..\..\gRPC;..\..\..\GrijjyFoundation;..\..\..\sgcWebSockets\Source\;..\..\..\sgcWebSockets\libD10_2\android;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
         <Icon_MainIcon>$(BDS)\bin\delphi_PROJECTICON.ico</Icon_MainIcon>
         <AUP_CAMERA>true</AUP_CAMERA>
         <AUP_WRITE_CALENDAR>true</AUP_WRITE_CALENDAR>
@@ -362,16 +362,14 @@
             <Form>Form4</Form>
             <FormType>fmx</FormType>
         </DCCReference>
-        <DCCReference Include="..\..\Ultraware.Grpc.ws.pas"/>
-        <DCCReference Include="..\..\GrijjyFoundation\Grijjy.ProtocolBuffers.pas"/>
-        <DCCReference Include="..\..\GrijjyFoundation\Grijjy.SysUtils.pas"/>
-        <DCCReference Include="..\..\GrijjyFoundation\Grijjy.Collections.pas"/>
-        <DCCReference Include="..\..\ngHttp2\Nghttp2.pas"/>
+        <DCCReference Include="..\..\..\gRPC\Ultraware.Grpc.ws.pas"/>
+        <DCCReference Include="..\..\..\GrijjyFoundation\Grijjy.ProtocolBuffers.pas"/>
+        <DCCReference Include="..\..\..\GrijjyFoundation\Grijjy.SysUtils.pas"/>
+        <DCCReference Include="..\..\..\GrijjyFoundation\Grijjy.Collections.pas"/>
+        <DCCReference Include="..\..\..\ngHttp2\Nghttp2.pas"/>
         <DCCReference Include="TestService.client.pas"/>
         <DCCReference Include="TestService.grpc.pas"/>
-        <DCCReference Include="TestService.proto.pas">
-            <Form>$R *.res</Form>
-        </DCCReference>
+        <DCCReference Include="TestService.proto.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -397,6 +395,7 @@
                     <Source Name="MainSource">AndroidGrpc.dpr</Source>
                 </Source>
                 <Excluded_Packages>
+                    <Excluded_Packages Name="D:\delphi3\DelphiXE10\Shared\BPL\UltrawareDevExpressBerlin10_1.bpl">Ultraware XE3 componenten</Excluded_Packages>
                     <Excluded_Packages Name="$(BDSBIN)\dcloffice2k250.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
                     <Excluded_Packages Name="$(BDSBIN)\dclofficexp250.bpl">Microsoft Office XP Sample Automation Server Wrapper Components</Excluded_Packages>
                 </Excluded_Packages>
@@ -1194,5 +1193,6 @@
     <Import Project="$(BDS)\Bin\CodeGear.Delphi.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')"/>
     <Import Project="$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj" Condition="Exists('$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj')"/>
     <Import Project="$(MSBuildProjectName).deployproj" Condition="Exists('$(MSBuildProjectName).deployproj')"/>
+    <ProjectExtensions/>
     <ProjectExtensions/>
 </Project>
