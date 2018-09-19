@@ -1,0 +1,140 @@
+object Form4: TForm4
+  Left = 0
+  Top = 0
+  Caption = 'Form4'
+  ClientHeight = 480
+  ClientWidth = 254
+  StyleBook = dmStyle.StyleBook1
+  FormFactor.Width = 320
+  FormFactor.Height = 480
+  FormFactor.Devices = [Desktop]
+  OnCreate = FormCreate
+  OnShow = FormShow
+  DesignerMasterStyle = 0
+  object Memo1: TMemo
+    Touch.InteractiveGestures = [Pan, LongTap, DoubleTap]
+    DataDetectorTypes = []
+    ReadOnly = True
+    Align = Client
+    Size.Width = 254.000000000000000000
+    Size.Height = 411.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 1
+    Viewport.Width = 246.000000000000000000
+    Viewport.Height = 403.000000000000000000
+  end
+  object Panel1: TPanel
+    Align = Bottom
+    Position.Y = 440.000000000000000000
+    Size.Width = 254.000000000000000000
+    Size.Height = 40.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 2
+    object btnParts: TButton
+      Align = Left
+      Margins.Left = 1.000000000000000000
+      Position.X = 187.000000000000000000
+      Position.Y = 10.000000000000000000
+      Size.Width = 119.000000000000000000
+      Size.Height = 30.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 4
+      Text = 'Audio (parts)'
+      OnClick = btnPartsClick
+    end
+    object btnRaw: TButton
+      Align = Left
+      Position.X = 89.000000000000000000
+      Position.Y = 10.000000000000000000
+      Size.Width = 97.000000000000000000
+      Size.Height = 30.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 3
+      Text = 'Audio.raw'
+      OnClick = btnRawClick
+    end
+    object ProgressBar1: TProgressBar
+      Align = Top
+      Orientation = Horizontal
+      Size.Width = 254.000000000000000000
+      Size.Height = 10.000000000000000000
+      Size.PlatformDefault = False
+      Value = 50.000000000000000000
+    end
+    object chkDebug: TCheckBox
+      Align = Left
+      Position.Y = 10.000000000000000000
+      Size.Width = 89.000000000000000000
+      Size.Height = 30.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 5
+      Text = 'Debug'
+      OnChange = chkDebugChange
+    end
+  end
+  object Panel2: TPanel
+    Align = Top
+    Size.Width = 254.000000000000000000
+    Size.Height = 29.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 3
+    object GridPanelLayout1: TGridPanelLayout
+      Align = Client
+      Size.Width = 254.000000000000000000
+      Size.Height = 29.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 1
+      ColumnCollection = <
+        item
+          Value = 50.000000000000000000
+        end
+        item
+          Value = 50.000000000000000000
+        end>
+      ControlCollection = <
+        item
+          Column = 0
+          Control = btnStart
+          Row = 0
+        end
+        item
+          Column = 1
+          Control = btnStop
+          Row = 0
+        end>
+      RowCollection = <
+        item
+          Value = 100.000000000000000000
+        end
+        item
+          SizeStyle = Auto
+        end>
+      object btnStart: TButton
+        Align = Client
+        Size.Width = 127.000000000000000000
+        Size.Height = 29.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 1
+        Text = 'Start'
+        OnClick = btnStartClick
+      end
+      object btnStop: TButton
+        Align = Client
+        Enabled = False
+        Size.Width = 127.000000000000000000
+        Size.Height = 29.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 0
+        Text = 'Stop'
+        OnClick = btnStopClick
+      end
+    end
+  end
+  object btnPing: TButton
+    Position.X = 8.000000000000000000
+    Position.Y = 384.000000000000000000
+    TabOrder = 5
+    Text = 'Ping'
+    OnClick = btnPingClick
+  end
+end
