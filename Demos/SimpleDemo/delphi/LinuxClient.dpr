@@ -8,7 +8,7 @@ uses
   Grijjy.ProtocolBuffers in '..\..\..\GrijjyFoundation\Grijjy.ProtocolBuffers.pas',
   Grijjy.SysUtils in '..\..\..\GrijjyFoundation\Grijjy.SysUtils.pas',
   Grijjy.Collections in '..\..\..\GrijjyFoundation\Grijjy.Collections.pas',
-//  Grijjy.SocketPool.Dummy in 'C:\Users\Administrator\Desktop\AndroidWS\Grijjy.SocketPool.Dummy.pas',
+//  Grijjy.SocketPool.Dummy
   Nghttp2 in '..\..\..\ngHttp2\Nghttp2.pas',
   TestService.client in 'TestService.client.pas',
   TestService.grpc in 'TestService.grpc.pas',
