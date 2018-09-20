@@ -30,29 +30,6 @@ object Form4: TForm4
     Size.Height = 40.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 2
-    object btnParts: TButton
-      Align = Left
-      Margins.Left = 1.000000000000000000
-      Position.X = 187.000000000000000000
-      Position.Y = 10.000000000000000000
-      Size.Width = 119.000000000000000000
-      Size.Height = 30.000000000000000000
-      Size.PlatformDefault = False
-      TabOrder = 4
-      Text = 'Audio (parts)'
-      OnClick = btnPartsClick
-    end
-    object btnRaw: TButton
-      Align = Left
-      Position.X = 89.000000000000000000
-      Position.Y = 10.000000000000000000
-      Size.Width = 97.000000000000000000
-      Size.Height = 30.000000000000000000
-      Size.PlatformDefault = False
-      TabOrder = 3
-      Text = 'Audio.raw'
-      OnClick = btnRawClick
-    end
     object ProgressBar1: TProgressBar
       Align = Top
       Orientation = Horizontal
@@ -67,7 +44,7 @@ object Form4: TForm4
       Size.Width = 89.000000000000000000
       Size.Height = 30.000000000000000000
       Size.PlatformDefault = False
-      TabOrder = 5
+      TabOrder = 3
       Text = 'Debug'
       OnChange = chkDebugChange
     end

@@ -11,8 +11,6 @@ type
   TForm4 = class(TForm)
     Memo1: TMemo;
     Panel1: TPanel;
-    btnParts: TButton;
-    btnRaw: TButton;
     Panel2: TPanel;
     GridPanelLayout1: TGridPanelLayout;
     btnStart: TButton;
@@ -23,8 +21,8 @@ type
     procedure btnStartClick(Sender: TObject);
     procedure btnStopClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
-    procedure btnRawClick(Sender: TObject);
-    procedure btnPartsClick(Sender: TObject);
+//    procedure btnRawClick(Sender: TObject);
+//    procedure btnPartsClick(Sender: TObject);
     procedure btnPingClick(Sender: TObject);
     procedure FormShow(Sender: TObject);
     procedure chkDebugChange(Sender: TObject);
@@ -84,9 +82,7 @@ end;
 
 procedure TForm4.chkDebugChange(Sender: TObject);
 begin
-  btnRaw.Visible   := chkDebug.IsChecked;
-  btnParts.Visible := chkDebug.IsChecked;
-  btnPing.Visible  := chkDebug.IsChecked;
+  btnPing.Visible := chkDebug.IsChecked;
 end;
 
 procedure TForm4.GetTextCallback(const aText: TText; aHasData, aClosed: Boolean);
@@ -114,39 +110,6 @@ begin
   Log(ltDebug, Format('Ping-pong, client = %d, server = %d, total = %dms',[100, t2.msec, watch.ElapsedMilliseconds]));
 end;
 
-procedure TForm4.btnRawClick(Sender: TObject);
-var
-  f: AndroidSpeech.Grpc.TFile;
-  t: TText;
-begin
-  f.filename := 'test.raw';
-  f.data := TFile.ReadAllBytes(f.filename);
-  f.sampleRate := sampleRate;
-
-  if btnStop.Enabled then
-    btnStopClick(nil);
-
-  t := FRecorder.UploadFile(f);
-  Memo1.Lines.Add(t.Text);
-end;
-
-procedure TForm4.btnPartsClick(Sender: TObject);
-var b: TBytes;
-    f: AndroidSpeech.Grpc.TFile;
-begin
-  f.filename := 'test.raw';
-  f.sampleRate := sampleRate;
-  b := TFile.ReadAllBytes(f.filename);
-  while b <> nil do
-  begin
-    f.data := Copy(b, 0, 1024);
-    FRecorder.Stream(f);
-    b := Copy(b, 1024, Length(b));    //  512 / 16000 * 1000 = 32ms
-    Sleep(10);
-  end;
-  FRecorder.StopStream;
-end;
-
 procedure TForm4.VUChanged(Sender: TObject);
 begin
   ProgressBar1.Max   := FRecorder.VUMax;
@@ -156,6 +119,9 @@ end;
 procedure TForm4.FormCreate(Sender: TObject);
 begin
   ProgressBar1.Value := 0;
+  {$IFDEF DEBUG}
+  chkDebug.IsChecked := True;
+  {$ENDIF}
   chkDebugChange(nil);
 end;
 
