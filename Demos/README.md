@@ -16,3 +16,6 @@ Make sure you have an Google Cloud account and downloaded the private key beside
 
 First start the server and then start the Android client (make sure both are using the same wifi network). 
 Tap on the "start" button and start speaking, it will automatically stop when some silence is detected.
+
+# RealtimeMoveDemo
+See "Generator" branch.
