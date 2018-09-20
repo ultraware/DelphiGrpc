@@ -2,7 +2,7 @@ unit Grijjy.Http2;
 
 { Windows (and Linux?) Cross-platform HTTP/2 protocol
   support class using scalable client ánd server sockets.
-
+  
   Modified version of the Grijjy.Http.pas unit to support gRPC 
   and both client and server implementations. 
 
@@ -84,8 +84,7 @@ type
     procedure OnSocketAccepted(aConnection: TgoSocketConnection);
   public
     constructor Create(const aBindAddress: string = '127.0.0.1'; aBindPort: Integer = 12345; aSSL: Boolean = false); override;
-
-    destructor  Destroy; override;
+    destructor  Destroy; override;
 
     procedure StartListen;
     procedure Stop;
@@ -263,8 +262,7 @@ type
       user_data: Pointer): Integer;
     function nghttp2_on_frame_recv_callback(session: pnghttp2_session; const frame: pnghttp2_frame;
       user_data: Pointer): Integer;
-
-    function nghttp2_on_header_callback(session: pnghttp2_session;
+    function nghttp2_on_header_callback(session: pnghttp2_session;
       const frame: pnghttp2_frame; const name: puint8; namelen: size_t;
       const value: puint8; valuelen: size_t; flags: uint8;
       user_data: Pointer): Integer; cdecl;
@@ -525,10 +523,8 @@ begin
   {$ENDIF}
 end;
 
-
-function data_source_request_read_callback(session: pnghttp2_session;
-
-  stream_id: int32; buf: puint8; len: size_t; data_flags: puint32;
+function data_source_request_read_callback(session: pnghttp2_session;
+  stream_id: int32; buf: puint8; len: size_t; data_flags: puint32;
   source: pnghttp2_data_source; user_data: Pointer): ssize_t; cdecl;
 var
   stream: TStreamRequest;
@@ -821,11 +817,9 @@ end;
 //end;
 
 { TgoHttpServer }
-
-
+
 constructor TgoHttp2Server.Create(const aBindAddress: string; aBindPort: Integer; aSSL: Boolean);
-
-begin
+begin
   inherited Create(aBindAddress, aBindPort, aSSL);
 
   { initialize nghttp2 library }
@@ -849,11 +843,11 @@ begin
   inherited;
   NameThreadForDebugging(Self.ClassName);
 
-  TMonitor.Enter(Self);
+  System.TMonitor.Enter(Self);
   DoListen;
   //wait till terminated
   while not Terminated do
-    TMonitor.Wait(Self, 5*1000);
+    System.TMonitor.Wait(Self, 5*1000);
 
   FConnection.CloseAccept;
   FConnection.Free;
@@ -862,7 +856,7 @@ end;
 procedure TListenThread.TerminatedSet;
 begin
   inherited;
-  TMonitor.Pulse(Self);
+  System.TMonitor.Pulse(Self);
 end;
 
 destructor TListenThread.Destroy;
@@ -875,9 +869,7 @@ begin
   FConnection := TgoSocketConnection.Create(HttpClientSocketManager, FAddress, FPort);
   FConnection.OnAccept := FServer.OnSocketAccepted;
 
-  if not FConnection.Accept(False{no nagle}) then
-    Assert(False, 'accept failed');
-end;
+  if not FConnection.Accept(False{no nagle}) then    Assert(False, 'accept failed');end;
 
 { TgoHttp2Server }
 
@@ -891,11 +883,11 @@ procedure TgoHttp2Server.OnSocketAccepted(aConnection: TgoSocketConnection);
 var session: TSessionContext;
 begin
   session := TSessionContext.Create(Self, aConnection, FCallbacks_http2);
-  TMonitor.Enter(FSessions);
+  System.TMonitor.Enter(FSessions);
   try
     FSessions.Add(session);
   finally
-    TMonitor.Exit(FSessions);
+    System.TMonitor.Exit(FSessions);
   end;
 
   aConnection.OnRecv := session.OnSocketRecv;
@@ -914,10 +906,7 @@ begin
   thread.Start;
 end;
 
-procedure TgoHttp2Server.Stop;
-var
-  session: TSessionContext;
-begin
+procedure TgoHttp2Server.Stop;var  session: TSessionContext;begin
   if FListenThread <> nil then
   begin
     FListenThread.Terminate;
@@ -926,13 +915,13 @@ begin
     FListenThread := nil;
   end;
 
-  TMonitor.Enter(FSessions);
+  System.TMonitor.Enter(FSessions);
   try
     for session in FSessions do
       session.Disconnect;
     FSessions.Clear;
   finally
-    TMonitor.Exit(FSessions);
+    System.TMonitor.Exit(FSessions);
   end;
 end;
 
@@ -940,11 +929,11 @@ end;
 
 procedure TSessionContext.AddStream(aStream: TStreamRequest);
 begin
-  TMonitor.Enter(FStreams);
+  System.TMonitor.Enter(FStreams);
   try
     FStreams.AddOrSetValue(aStream.StreamID, aStream);
   finally
-    TMonitor.Exit(FStreams);
+    System.TMonitor.Exit(FStreams);
   end;
 end;
 
@@ -1075,7 +1064,7 @@ var
   iLoop: Integer;
 begin
   Result := True;
-  TMonitor.Enter(Self);
+  System.TMonitor.Enter(Self);
   try
     if FConnection = nil then
       Exit(False);
@@ -1118,7 +1107,7 @@ begin
         Break;
     end;
   finally
-    TMonitor.Exit(Self);
+    System.TMonitor.Exit(Self);
   end;
 end;
 
@@ -1258,27 +1247,23 @@ var
 begin
   Result := 0;
   handled := False;
-  try
-    if Assigned(stream_data.OnFrameReceived) then
-    begin
+  if Assigned(stream_data.OnFrameReceived) then
+  begin
     {$IFDEF LOGGING}
-      OutputDebug(Format('Firing frame received event for stream object: id = %d',[stream_data.StreamID]));
+    OutputDebug(Format('Firing frame received event for stream object: id = %d',[stream_data.StreamID]));
     {$ENDIF}
-      stream_data.OnFrameReceived(stream_data, handled);
-    end;
-    if not handled and Assigned(OnStreamFrameReceived) then
-    begin
-    {$IFDEF LOGGING}
-      OutputDebug(Format('Firing frame received event for session object',[]));
-    {$ENDIF}
-      OnStreamFrameReceived(stream_data, handled);
-    end;
-
-    if not handled and IsServerContext then
-      Exit( Send404Response(session, stream_data) );
-  except
-    Result := -1;
+    stream_data.OnFrameReceived(stream_data, handled);
   end;
+  if not handled and Assigned(OnStreamFrameReceived) then
+  begin
+    {$IFDEF LOGGING}
+    OutputDebug(Format('Firing frame received event for session object',[]));
+    {$ENDIF}
+    OnStreamFrameReceived(stream_data, handled);
+  end;
+
+  if not handled and IsServerContext then
+    Exit( Send404Response(session, stream_data) );
 end;
 
 function TSessionContext.Send404Response(session: pnghttp2_session; stream_data: TStreamRequest): Integer;
@@ -1304,10 +1289,16 @@ begin
     stream_data.ResponseHeaders.AsNgHttp2Array(ngheaders);
     stream_data.FResponseProvider.source.ptr := stream_data;
     stream_data.FResponseProvider.read_callback := data_source_response_read_callback;
-    if stream_data.ResponseBuffer.Size > 0 then
-      Result := nghttp2_submit_response(session, stream_data.StreamID, @ngheaders[0], Length(ngheaders), @stream_data.FResponseProvider)
-    else
-      Result := nghttp2_submit_response(session, stream_data.StreamID, @ngheaders[0], Length(ngheaders), nil);
+
+    System.TMonitor.Enter(Self);
+    try
+      if stream_data.ResponseBuffer.Size > 0 then
+        Result := nghttp2_submit_response(session, stream_data.StreamID, @ngheaders[0], Length(ngheaders), @stream_data.FResponseProvider)
+      else
+        Result := nghttp2_submit_response(session, stream_data.StreamID, @ngheaders[0], Length(ngheaders), nil);
+    finally
+      System.TMonitor.Exit(Self);
+    end;
   end
   else
     Result := 0;
@@ -1318,7 +1309,7 @@ end;
 
 function TSessionContext.GetOrCreateStream(aStreamID: Integer): TStreamRequest;
 begin
-  TMonitor.Enter(FStreams);
+  System.TMonitor.Enter(FStreams);
   try
     if not FStreams.TryGetValue(aStreamID, Result) then
     begin
@@ -1327,7 +1318,7 @@ begin
         FStreams.AddOrSetValue(aStreamID, Result);
     end;
   finally
-    TMonitor.Exit(FStreams);
+    System.TMonitor.Exit(FStreams);
   end;
 end;
 
@@ -1345,13 +1336,13 @@ function TSessionContext.IsRequestEOF: Boolean;
 var strm: TStreamRequest;
 begin
   Result := True;
-  TMonitor.Enter(FStreams);
+  System.TMonitor.Enter(FStreams);
   try
     for strm in FStreams.Values do
       if not strm.IsRequestEOF then
         Exit(False);
   finally
-    TMonitor.Exit(FStreams);
+    System.TMonitor.Exit(FStreams);
   end;
 end;
 
@@ -1359,13 +1350,13 @@ function TSessionContext.IsResponseEOF: Boolean;
 var strm: TStreamRequest;
 begin
   Result := True;
-  TMonitor.Enter(FStreams);
+  System.TMonitor.Enter(FStreams);
   try
     for strm in FStreams.Values do
       if not strm.IsResponseEOF then
         Exit(False);
   finally
-    TMonitor.Exit(FStreams);
+    System.TMonitor.Exit(FStreams);
   end;
 end;
 
@@ -1373,12 +1364,12 @@ function TSessionContext.GetTotalRequestSize: Integer;
 var strm: TStreamRequest;
 begin
   Result := 0;
-  TMonitor.Enter(FStreams);
+  System.TMonitor.Enter(FStreams);
   try
     for strm in FStreams.Values do
       Inc(Result, strm.RequestBuffer.Size);
   finally
-    TMonitor.Exit(FStreams);
+    System.TMonitor.Exit(FStreams);
   end;
 end;
 
@@ -1386,12 +1377,12 @@ function TSessionContext.GetTotalResponseSize: Integer;
 var strm: TStreamRequest;
 begin
   Result := 0;
-  TMonitor.Enter(FStreams);
+  System.TMonitor.Enter(FStreams);
   try
     for strm in FStreams.Values do
       Inc(Result, strm.ResponseBuffer.Size);
   finally
-    TMonitor.Exit(FStreams);
+    System.TMonitor.Exit(FStreams);
   end;
 end;
 
@@ -1413,7 +1404,7 @@ procedure TSessionContext.OnSocketDisconnected;
 begin
   System.TMonitor.Enter(Self);
   try
-  HttpClientSocketManager.Release(Self.FConnection);
+    HttpClientSocketManager.Release(Self.FConnection);
     Self.FConnection := nil;
   finally
     System.TMonitor.Exit(Self);
@@ -1504,8 +1495,6 @@ begin
     { add host }
     FInternalHeaders.AddOrSet('host', Self.Context.FHttpOwner.FAddress);
 
-  FInternalHeaders.AddOrSet('te', 'trailers');
-
   { add authorization }
   if (_Username <> '') then
   begin
@@ -1593,7 +1582,7 @@ begin
     { submit request }
     TMonitor.Enter(FContext);
     try
-    FStreamId := nghttp2_submit_request(FContext.FSession_http2, Nil, @headers[0], Length(headers), @FRequestProvider, Self);
+      FStreamId := nghttp2_submit_request(FContext.FSession_http2, Nil, @headers[0], Length(headers), @FRequestProvider, Self);
       {$IFDEF LOGGING}
       OutputDebug(Format('New request = %d',[FStreamId]));
       {$ENDIF}
@@ -1693,7 +1682,7 @@ end;
 procedure TBoolean.SetValue(const aValue: Boolean);
 begin
   FValue := aValue;
-  TMonitor.PulseAll(Self);
+  System.TMonitor.PulseAll(Self);
 end;
 
 function TBoolean.Wait(ATimeout: Integer; aCheckSynchronize: Boolean): Boolean;
@@ -1715,8 +1704,8 @@ begin
   end
   else if not Self.Value then
   begin
-    TMonitor.Enter(Self);
-    TMonitor.Wait(Self, ATimeout);
+    System.TMonitor.Enter(Self);
+    System.TMonitor.Wait(Self, ATimeout);
   end;
   Result := Self.Value;
 end;

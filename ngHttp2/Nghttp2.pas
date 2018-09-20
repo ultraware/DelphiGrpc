@@ -372,8 +372,6 @@ begin
   nghttp2_submit_settings := GetProc(NGHTTP2Handle, 'nghttp2_submit_settings');
   nghttp2_session_client_new := GetProc(NGHTTP2Handle, 'nghttp2_session_client_new');
   nghttp2_session_server_new := GetProc(NGHTTP2Handle, 'nghttp2_session_server_new');
-//  if not Assigned(nghttp2_session_server_new) then
-//    RaiseLastOSError;
 
   nghttp2_session_callbacks_new := GetProc(NGHTTP2Handle, 'nghttp2_session_callbacks_new');
   nghttp2_session_callbacks_del := GetProc(NGHTTP2Handle, 'nghttp2_session_callbacks_del');

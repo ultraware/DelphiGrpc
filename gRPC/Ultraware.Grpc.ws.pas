@@ -3,12 +3,12 @@ unit Ultraware.Grpc.Ws;
 interface
 
 //{$DEFINE LOGGING}
+
 uses
-  Grijjy.ProtocolBuffers,
-  System.SysUtils, Ultraware.Grpc, Ultraware.Grpc.Client, Ultraware.Grpc.Server,
-  Grijjy.Http, Grijjy.Http2,
-  sgcWebSocket_Classes, sgcWebSocket_Client,
-  System.Classes, System.Generics.Collections, sgcWebSocket_Server;
+  System.SysUtils, System.Classes, System.Generics.Collections,
+  Grijjy.ProtocolBuffers, Grijjy.Http,
+  Ultraware.Grpc, Grijjy.Http2,
+  sgcWebSocket_Classes, sgcWebSocket_Client, sgcWebSocket_Server;
 
 type
   {$WARN UNSUPPORTED_CONSTRUCT ERROR}
@@ -34,12 +34,6 @@ type
   public
     function  Serialize: TBytes;
     procedure Deserialize(const aStream: TBytes);
-  end;
-
-  IGrpcClient = interface
-    ['{A6132D0A-1EB5-41B2-8F5F-21E2C28CD250}']
-    function DoRequest(const aSendData: TBytes; const aGrpcPath: string; out aReceivedData: TBytes): Boolean; overload;
-    function DoRequest(const aSendData: TBytes; const aGrpcPath: string; const aReceiveCallback: TGrpcCallback): IGrpcStream; overload;
   end;
 
   TGrpcWsClient = class(TInterfacedObject, IGrpcClient)
@@ -266,7 +260,6 @@ begin
 end;
 
 procedure TGrpcWsClient.Connect(const aHost: string; aPort: Integer);
-var vOptions: string;
 begin
   FWSClient.UseNagle := False;
   FWSClient.OnConnect := OnWSConnected;
@@ -412,7 +405,7 @@ begin
     begin
       guid := aConnection.Guid;
 
-      if impl.HandleGRPC(wsreq, packet.data,
+      if impl.HandleGRPC(wsreq.path, packet.data,
         procedure(const aData: TBytes; aIsStreamClosed: Boolean)
         var
           packet: TGrpcPacket;
@@ -439,8 +432,6 @@ begin
             strm.Write(b, Length(b));
             strm.Position := 0;
             FWSServer.WriteData(guid, strm);
-            //aConnection.WriteData(strm);
-            //s := TNetEncoding.Base64.EncodeBytesToString(b);
           finally
             strm.Free;
           end;
@@ -559,8 +550,6 @@ begin
 end;
 
 function TGrpcWsStream.CloseAndRecvData(out aResult: TBytes): Boolean;
-var
-  packet: TGrpcPacket;
 begin
   Result := False;
   SendData(nil, True {close});
@@ -575,7 +564,7 @@ end;
 procedure TGrpcWsStream.DoCloseSend;
 begin
   if not IsRequestClosed then
-  SendData(nil, True);
+    SendData(nil, True);
 end;
 
 function TGrpcWsStream.IsResponseClosed: Boolean;
