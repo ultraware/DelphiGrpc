@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package demoservice;
+
+// Interface exported by the server.
+service MoveService {
+  rpc ContinuousMove(stream Move) returns (Move) {}
+  rpc WaitForMove(stream Move) returns (stream Move) {}
+}
+
+message Move {
+  int32 X = 1;
+  int32 Y = 2;
+  string Name = 3;
+}
