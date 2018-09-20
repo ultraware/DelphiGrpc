@@ -18,9 +18,11 @@ The following features are implemented:
 - only Windows (http/2) and Android (websocket) platforms are implemented and tested, Linux client works with websockets
 - Basic set of gRPC specification
 
+# Generator
+  See Generator branch for .proto importer and generator
+
 # Missing
 - SSL support (in place but not tested yet)
-- No .proto importer (code generator)
 - Full gRPC specification implementation (timeout and ping handling, compression, metadata, bandwidth throttling, etc.)
 - Full Linux support 
 - Stress and monkey tests (random connection loss handling not tested yet)
