@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package ImportPackage;
+
+message MsgImported {
+	double Dobule = 1;
+	int32 Int32 = 2;
+}
+
+service ImportedService{
+	rpc RandomFunc(MsgImported) returns (MsgImported) {}
+}
